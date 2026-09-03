@@ -110,7 +110,7 @@ do
   vim.o.number = true
   -- You can also add relative line numbers, to help with jumping.
   --  Experiment for yourself to see if you like it!
-  -- vim.o.relativenumber = true
+  vim.o.relativenumber = true
 
   -- Enable mouse mode, can be useful for resizing splits for example!
   vim.o.mouse = 'a'
@@ -382,18 +382,31 @@ do
   -- change the command under that to load whatever the name of that colorscheme is.
   --
   -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
-  vim.pack.add { gh 'folke/tokyonight.nvim' }
+  vim.pack.add {
+    { src = 'https://github.com/catppuccin/nvim' },
+  }
   ---@diagnostic disable-next-line: missing-fields
-  require('tokyonight').setup {
-    styles = {
-      comments = { italic = false }, -- Disable italics in comments
-    },
+  require('catppuccin').setup {
+    flavour = 'mocha',
   }
 
   -- Load the colorscheme here.
   -- Like many other themes, this one has different styles, and you could load
-  -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-  vim.cmd.colorscheme 'tokyonight-night'
+  -- any other, such as 'latte', 'frappe', or 'macchiato'.
+  vim.cmd.colorscheme 'catppuccin'
+
+  local function set_black_background(name)
+    local highlight = vim.api.nvim_get_hl(0, { name = name, link = false })
+    highlight.bg = 0x000000
+    highlight.link = nil
+    vim.api.nvim_set_hl(0, name, highlight)
+  end
+
+  -- Main editing area, including an unfocused empty buffer beside Neo-tree.
+  set_black_background 'Normal'
+  set_black_background 'NormalNC'
+  set_black_background 'EndOfBuffer'
+  vim.api.nvim_set_hl(0, 'NeoTreeDirectoryIcon', { fg = '#fab387' })
 
   -- Highlight todo, notes, etc in comments
   vim.pack.add { gh 'folke/todo-comments.nvim' }
@@ -438,6 +451,13 @@ do
   local statusline = require 'mini.statusline'
   -- Set `use_icons` to true if you have a Nerd Font
   statusline.setup { use_icons = vim.g.have_nerd_font }
+
+  -- Make every segment of Mini Statusline black while retaining its text color.
+  set_black_background 'StatusLine'
+  set_black_background 'StatusLineNC'
+  for name in pairs(vim.api.nvim_get_hl(0, {})) do
+    if name:match '^MiniStatusline' then set_black_background(name) end
+  end
 
   -- You can configure sections in the statusline by overriding their
   -- default behavior. For example, here we set the section for
@@ -692,7 +712,7 @@ do
   --  See `:help lsp-config` for information about keys and how to configure
   ---@type table<string, vim.lsp.Config>
   local servers = {
-    -- clangd = {},
+    clangd = {},
     -- gopls = {},
     -- pyright = {},
     -- rust_analyzer = {},
@@ -852,7 +872,13 @@ do
       -- <c-k>: Toggle signature help
       --
       -- See `:help blink-cmp-config-keymap` for defining your own keymap
-      preset = 'default',
+      preset = 'none',
+  ['<Up>'] = { 'select_prev', 'fallback' },
+  ['<Down>'] = { 'select_next', 'fallback' },
+  ['<CR>'] = { 'accept', 'fallback' },
+  ['<C-space>'] = { 'show', 'show_documentation', 'hide_documentation' },
+  ['<Tab>'] = { 'snippet_forward', 'fallback' },
+  ['<S-Tab>'] = { 'snippet_backward', 'fallback' },     
 
       -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
       --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
@@ -970,13 +996,55 @@ do
   -- require 'kickstart.plugins.indent_line'
   -- require 'kickstart.plugins.lint'
   -- require 'kickstart.plugins.autopairs'
-  -- require 'kickstart.plugins.neo-tree'
+  require 'kickstart.plugins.neo-tree'
   -- require 'kickstart.plugins.gitsigns' -- adds gitsigns recommended keymaps
 
   -- NOTE: You can add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   -- require 'custom.plugins'
+vim.keymap.set('n', '<leader>l', function()
+  local date = os.date('%Y-%m-%d')
+  local full_date = os.date('%A, %B %d %Y')
+  local path = vim.fn.expand('~/notes/') .. date .. '.txt'
+
+  -- Create notes folder if it doesn't exist
+  vim.fn.mkdir(vim.fn.expand('~/notes'), 'p')
+
+  vim.cmd('edit ' .. path)
+
+  -- Only write template if file is new/empty
+  if vim.fn.filereadable(path) == 0 or vim.fn.getfsize(path) == 0 then
+    local lines = {
+      '═══════════════════════════════════',
+       full_date,
+      '═══════════════════════════════════',
+     
+      'TODO', '',
+      '─────────────────────────────────',
+     
+      'IN PROGRESS',
+ '',
+      '─────────────────────────────────',
+      
+      'DONE',
+      '',
+      '─────────────────────────────────',
+      
+      'NOTES', '',
+      '─────────────────────────────────',
+      '',
+    }
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+    vim.cmd('write')
+  end
+end, { desc = 'Open daily todo' })
+
+vim.keymap.set('n', '<leader>cp', function()
+  local path = vim.fn.expand('%:p')
+  vim.fn.setreg('+', path)
+  print('Copied: ' .. path)
+end, { desc = 'Copy file path' })
 end
 
 -- The line beneath this is called `modeline`. See `:help modeline`
